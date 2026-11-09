@@ -8,8 +8,10 @@ const isProjector = new URLSearchParams(window.location.search).get('mode') === 
 
 let currentMode = 'speed'; // speed | numpad | hunt | office
 let currentDifficulty = 'med'; // easy | med | hard
+let selectedDuration = parseInt(localStorage.getItem('adat_arena_duration'), 10) || 60;
+let gameDuration = selectedDuration;
 let timer = null;
-let timeLeft = 60;
+let timeLeft = selectedDuration;
 let gameActive = false;
 let activePlayerName = "Vendég Játékos";
 
@@ -239,6 +241,7 @@ window.addEventListener('DOMContentLoaded', () => {
     renderLeaderboard('projLbRows');
   } else {
     initWordsDatabase();
+    setGameDuration(selectedDuration);
     setDifficulty('med');
     switchMode('speed');
     renderEditorTable();
@@ -251,10 +254,14 @@ function handleSyncMessage(data) {
   const { type, payload } = data;
   if (type === 'PLAYER_START' && isProjector) {
     document.getElementById('projPlayerName').innerText = payload.name;
+    const projTime = document.getElementById('projTime');
+    if (projTime) projTime.innerText = (payload.duration || 60) + 's';
     document.getElementById('projCPM').innerText = '0 CPM';
     document.getElementById('projAcc').innerText = '100%';
     document.getElementById('projScore').innerText = '0';
   } else if (type === 'TICK' && isProjector) {
+    const projTime = document.getElementById('projTime');
+    if (projTime && payload.timeLeft !== undefined) projTime.innerText = payload.timeLeft + 's';
     document.getElementById('projCPM').innerText = payload.cpm + ' CPM';
     document.getElementById('projAcc').innerText = payload.acc + '%';
     document.getElementById('projScore').innerText = payload.score;
@@ -303,8 +310,35 @@ window.addEventListener('click', (e) => {
 });
 
 // ==========================================
-// 3. NEHÉZSÉGI SZINTEK KEZELÉSE
+// 3. JÁTÉKIDŐ ÉS NEHÉZSÉGI SZINTEK KEZELÉSE
 // ==========================================
+function setGameDuration(seconds) {
+  selectedDuration = parseInt(seconds, 10) || 60;
+  localStorage.setItem('adat_arena_duration', selectedDuration);
+
+  // HUD és Overlay gombok aktív állapotának frissítése
+  [30, 60, 90, 120].forEach(sec => {
+    const btn = document.getElementById('timeBtn-' + sec);
+    const ovBtn = document.getElementById('overlayTimeBtn-' + sec);
+    if (btn) {
+      if (sec === selectedDuration) btn.classList.add('active');
+      else btn.classList.remove('active');
+    }
+    if (ovBtn) {
+      if (sec === selectedDuration) ovBtn.classList.add('active');
+      else ovBtn.classList.remove('active');
+    }
+  });
+
+  if (!gameActive) {
+    const hudTime = document.getElementById('hudTime');
+    if (hudTime) hudTime.innerText = selectedDuration + 's';
+  }
+
+  const startBtn = document.getElementById('btnStartGame');
+  if (startBtn) startBtn.innerText = `🚀 JÁTÉK INDÍTÁSA (${selectedDuration} mp)`;
+}
+
 function setDifficulty(diff) {
   currentDifficulty = diff;
   ['easy', 'med', 'hard'].forEach(d => {
@@ -348,7 +382,7 @@ function switchMode(mode) {
   const huntEditorPanel = document.getElementById('huntEditorPanel');
   if (huntEditorPanel) huntEditorPanel.style.display = mode === 'hunt' ? 'block' : 'none';
   const startBtn = document.getElementById('btnStartGame');
-  if (startBtn) startBtn.innerText = mode === 'office' ? '🚀 JÁTÉK INDÍTÁSA (90 mp)' : '🚀 JÁTÉK INDÍTÁSA (60 mp)';
+  if (startBtn) startBtn.innerText = `🚀 JÁTÉK INDÍTÁSA (${selectedDuration} mp)`;
 
   speedView.style.display = mode === 'speed' ? 'block' : 'none';
   numpadView.style.display = mode === 'numpad' ? 'flex' : 'none';
@@ -413,11 +447,12 @@ function startTheGame() {
 
   broadcastSync({
     type: 'PLAYER_START',
-    payload: { name: activePlayerName }
+    payload: { name: activePlayerName, duration: gameDuration }
   });
 
   clearInterval(timer);
-  timeLeft = (currentMode === 'office') ? 90 : 60;
+  gameDuration = selectedDuration;
+  timeLeft = gameDuration;
   totalTyped = 0;
   correctTyped = 0;
   errors = 0;
@@ -466,8 +501,7 @@ function focusHiddenInput() {
 }
 
 function updateHUD() {
-  const maxTime = (currentMode === 'office') ? 90 : 60;
-  const elapsedSec = maxTime - timeLeft;
+  const elapsedSec = gameDuration - timeLeft;
   const elapsedMins = elapsedSec > 0 ? elapsedSec / 60 : 1 / 60;
   const cpm = Math.round(correctTyped / elapsedMins);
   const acc = totalTyped > 0 ? Math.round((correctTyped / totalTyped) * 100) : 100;
@@ -479,7 +513,7 @@ function updateHUD() {
 
   broadcastSync({
     type: 'TICK',
-    payload: { cpm, acc, score }
+    payload: { cpm, acc, score, timeLeft }
   });
 }
 
@@ -955,11 +989,25 @@ if (hiddenInput) {
 }
 
 document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    const modal = document.getElementById('resultModal');
+    if (modal && modal.classList.contains('open')) {
+      closeResultAndShowStart();
+      return;
+    }
+  }
+
   if (e.target.closest('input, textarea, select')) {
     if (e.target.id !== 'hiddenInput') return;
   }
 
   if (!gameActive) return;
+
+  // Védelem: A Tab ne vigye el a fókuszt a gombokra gépelés közben!
+  if (e.key === 'Tab') {
+    e.preventDefault();
+    return;
+  }
 
   if (currentMode === 'numpad') {
     const items = NUMPAD_ITEMS[currentDifficulty] || NUMPAD_ITEMS.med;
@@ -1371,8 +1419,7 @@ function endGame() {
   gameActive = false;
   clearKeyboardHighlights();
 
-  const maxTime = (currentMode === 'office') ? 90 : 60;
-  const elapsedSec = maxTime - timeLeft;
+  const elapsedSec = gameDuration - timeLeft;
   const elapsedMins = elapsedSec > 0 ? elapsedSec / 60 : 1;
   const finalCPM = Math.round(correctTyped / elapsedMins);
   const finalAcc = totalTyped > 0 ? Math.round((correctTyped / totalTyped) * 100) : 100;
@@ -1430,16 +1477,16 @@ function endGame() {
   leaderboard.sort((a, b) => b.score - a.score || b.cpm - a.cpm);
   localStorage.setItem('adat_arena_lb', JSON.stringify(leaderboard));
 
-  // Mód / szint a kártyán
-  const modeText = `${modeLabels[currentMode] || currentMode} (${diffLabels[currentDifficulty] || 'Haladó'})`;
+  // Mód / szint és futamidő a kártyán
+  const modeText = `${modeLabels[currentMode] || currentMode} (${diffLabels[currentDifficulty] || 'Haladó'}, ${gameDuration} mp)`;
   const stkMode = document.getElementById('stkMode');
   if (stkMode) stkMode.innerText = modeText;
 
-  // Eredmény eltárolása az e-mail küldéshez (e-mail cím NÉLKÜL)
+  // Eredmény eltárolása az e-mail küldéshez
   lastResult = {
     name: activePlayerName,
     mode: modeLabels[currentMode] || currentMode,
-    difficulty: diffLabels[currentDifficulty] || 'Haladó',
+    difficulty: `${diffLabels[currentDifficulty] || 'Haladó'} (${gameDuration} mp)`,
     cpm: finalCPM,
     acc: finalAcc,
     score: score,
@@ -1462,6 +1509,14 @@ function endGame() {
   document.getElementById('resultModal').classList.add('open');
 }
 
+function restartSamePlayer() {
+  document.getElementById('resultModal').classList.remove('open');
+  const emailInput = document.getElementById('resultEmailInput');
+  if (emailInput) emailInput.value = '';
+  setEmailStatus('', '');
+  startTheGame();
+}
+
 function closeResultAndShowStart() {
   document.getElementById('resultModal').classList.remove('open');
   const emailInput = document.getElementById('resultEmailInput');
@@ -1470,8 +1525,9 @@ function closeResultAndShowStart() {
   document.getElementById('startOverlay').style.display = 'flex';
   const nameInput = document.getElementById('playerNameInputMain');
   if (nameInput) {
+    nameInput.value = '';
+    nameInput.placeholder = 'Írd be a neved...';
     nameInput.focus();
-    nameInput.select();
   }
 }
 

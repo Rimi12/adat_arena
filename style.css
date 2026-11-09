@@ -114,13 +114,14 @@ main {
 .mode-info h3 { font-size: 0.9rem; }
 .mode-info p { font-size: 0.72rem; color: var(--text-muted); }
 
-/* Műszerfal (HUD) & Szintválasztó */
+/* Műszerfal (HUD) & Szint- és Időválasztó */
 .hud-wrapper {
   display: flex;
   gap: 0.75rem;
   align-items: stretch;
+  flex-wrap: wrap;
 }
-.hud { flex: 1; display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.6rem; }
+.hud { flex: 1.4; display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.6rem; min-width: 320px; }
 .hud-box {
   background: var(--card-bg);
   border: 1px solid var(--card-border);
@@ -131,36 +132,62 @@ main {
 .hud-label { font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
 .hud-val { font-size: 1.5rem; font-weight: 800; color: var(--accent); margin-top: 0.2rem; font-variant-numeric: tabular-nums; }
 
-/* Nehézségi szint választó */
-.diff-selector {
+.hud-selectors {
+  display: flex;
+  gap: 0.5rem;
+  flex: 1;
+  min-width: 300px;
+}
+
+/* Nehézségi szint és Játékidő választók */
+.diff-selector, .time-selector {
+  flex: 1;
   background: var(--card-bg);
   border: 1px solid var(--card-border);
   border-radius: 8px;
-  padding: 0.5rem 0.75rem;
+  padding: 0.5rem 0.65rem;
   display: flex;
   flex-direction: column;
   justify-content: center;
   gap: 0.3rem;
-  min-width: 200px;
+  min-width: 140px;
 }
-.diff-label { font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700; }
-.diff-pills { display: flex; gap: 0.25rem; }
-.diff-btn {
+.diff-label, .time-label { font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700; }
+.diff-pills, .time-pills { display: flex; gap: 0.25rem; }
+.diff-btn, .time-btn {
   flex: 1;
   background: #0f172a;
   border: 1px solid var(--card-border);
   color: var(--text-muted);
   font-size: 0.72rem;
   font-weight: 700;
-  padding: 0.3rem 0.4rem;
+  padding: 0.35rem 0.3rem;
   border-radius: 4px;
   cursor: pointer;
   transition: all 0.15s;
+  white-space: nowrap;
+  text-align: center;
 }
-.diff-btn:hover { color: #fff; }
+.diff-btn:hover, .time-btn:hover { color: #fff; }
 .diff-btn.active.diff-easy { background: rgba(34, 197, 94, 0.2); border-color: var(--success); color: var(--success); }
 .diff-btn.active.diff-med { background: rgba(56, 189, 248, 0.2); border-color: var(--accent); color: var(--accent); }
 .diff-btn.active.diff-hard { background: rgba(245, 158, 11, 0.2); border-color: var(--warning); color: var(--warning); }
+
+.time-btn.active {
+  background: rgba(56, 189, 248, 0.2);
+  border-color: var(--accent);
+  color: var(--accent);
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.3);
+}
+
+.overlay-time-pills {
+  width: 100%;
+  margin-top: 0.2rem;
+}
+.overlay-time-pills .time-btn {
+  padding: 0.5rem 0.4rem;
+  font-size: 0.82rem;
+}
 
 /* Fő Játéktér */
 .arena-panel {

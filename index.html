@@ -55,7 +55,7 @@
         </div>
       </div>
 
-      <!-- Műszerfal (HUD) & Nehézségi szint választó -->
+      <!-- Műszerfal (HUD) & Szint- és Időválasztó -->
       <div class="hud-wrapper">
         <div class="hud">
           <div class="hud-box">
@@ -76,12 +76,24 @@
           </div>
         </div>
 
-        <div class="diff-selector" id="diffSelectorPanel">
-          <div class="diff-label">Nehézségi szint</div>
-          <div class="diff-pills">
-            <button class="diff-btn diff-easy" id="diffBtn-easy" onclick="setDifficulty('easy')">Kezdő</button>
-            <button class="diff-btn diff-med active" id="diffBtn-med" onclick="setDifficulty('med')">Haladó</button>
-            <button class="diff-btn diff-hard" id="diffBtn-hard" onclick="setDifficulty('hard')">Bajnok</button>
+        <div class="hud-selectors">
+          <div class="diff-selector" id="diffSelectorPanel">
+            <div class="diff-label">Nehézség</div>
+            <div class="diff-pills">
+              <button class="diff-btn diff-easy" id="diffBtn-easy" onclick="setDifficulty('easy')">Kezdő</button>
+              <button class="diff-btn diff-med active" id="diffBtn-med" onclick="setDifficulty('med')">Haladó</button>
+              <button class="diff-btn diff-hard" id="diffBtn-hard" onclick="setDifficulty('hard')">Bajnok</button>
+            </div>
+          </div>
+
+          <div class="time-selector" id="timeSelectorPanel">
+            <div class="time-label">Játékidő</div>
+            <div class="time-pills">
+              <button class="time-btn" id="timeBtn-30" onclick="setGameDuration(30)">30s</button>
+              <button class="time-btn active" id="timeBtn-60" onclick="setGameDuration(60)">60s</button>
+              <button class="time-btn" id="timeBtn-90" onclick="setGameDuration(90)">90s</button>
+              <button class="time-btn" id="timeBtn-120" onclick="setGameDuration(120)">120s</button>
+            </div>
           </div>
         </div>
       </div>
@@ -96,6 +108,13 @@
           <div class="start-inputs">
             <label for="playerNameInputMain">Versenyző neve:</label>
             <input type="text" id="playerNameInputMain" value="Vendég Játékos" onkeydown="if(event.key==='Enter') startTheGame()">
+            <label style="margin-top:0.4rem;">Futamidő kiválasztása:</label>
+            <div class="time-pills overlay-time-pills">
+              <button class="time-btn" id="overlayTimeBtn-30" onclick="setGameDuration(30)">30 mp</button>
+              <button class="time-btn active" id="overlayTimeBtn-60" onclick="setGameDuration(60)">60 mp</button>
+              <button class="time-btn" id="overlayTimeBtn-90" onclick="setGameDuration(90)">90 mp</button>
+              <button class="time-btn" id="overlayTimeBtn-120" onclick="setGameDuration(120)">120 mp</button>
+            </div>
           </div>
           <button class="btn-start-action" onclick="startTheGame()" id="btnStartGame">🚀 JÁTÉK INDÍTÁSA (60 mp)</button>
         </div>
@@ -334,6 +353,10 @@
       <div class="name" id="projPlayerName">Vendég Játékos</div>
       <div class="live-stats">
         <div>
+          <div style="font-size:1rem; color:var(--text-muted);">HÁTRALÉVŐ IDŐ</div>
+          <div class="live-stat-val" id="projTime">60s</div>
+        </div>
+        <div>
           <div style="font-size:1rem; color:var(--text-muted);">SEBESSÉG</div>
           <div class="live-stat-val" id="projCPM">0 <span style="font-size:1.5rem">CPM</span></div>
         </div>
@@ -403,8 +426,9 @@
         <div class="email-status" id="emailStatus"></div>
       </div>
       <div style="display:flex; gap:0.5rem; justify-content:center; margin-top:1rem; flex-wrap:wrap;">
+        <button class="btn-primary" onclick="restartSamePlayer()">🔄 Új menet (ugyanazzal a névvel)</button>
+        <button class="btn-outline" onclick="closeResultAndShowStart()">👤 Másik versenyző / Új név</button>
         <button class="btn-outline" onclick="exportLeaderboardCSV()">📥 CSV Export</button>
-        <button class="btn-outline" onclick="closeResultAndShowStart()">Új Menet / Új Név</button>
       </div>
     </div>
   </div>
