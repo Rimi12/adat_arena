@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ADAT-ARÉNA – Számítógépes Adatrögzítő Kioszk</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- KIOSZK / VERSENYZŐI NÉZET -->
+  <div id="kioskContainer">
+    <header>
+      <div class="brand">
+        <span>⚡</span> ADAT-ARÉNA <span class="badge">v2.0 Pro</span>
+      </div>
+      <div class="header-actions">
+        <button class="btn-outline" id="btnSoundToggle" onclick="toggleSound()">🔊 Hang: Be</button>
+        <button class="btn-outline" onclick="exportLeaderboardCSV()">📥 CSV Export</button>
+        <button class="btn-outline" onclick="openProjectorWindow()">📺 Kivetítő ablak</button>
+        <button class="btn-outline" onclick="resetLeaderboard()">🗑️ Ranglista ürítése</button>
+      </div>
+    </header>
+
+    <main>
+      <!-- Játékmód Választó Fülek (4 Mód) -->
+      <div class="modes-bar">
+        <div class="mode-card active" id="modeCard-speed" onclick="switchMode('speed')">
+          <div class="mode-icon">⌨️</div>
+          <div class="mode-info">
+            <h3>Gépíró Sprint</h3>
+            <p>Magyar szöveg és leütési sebesség</p>
+          </div>
+        </div>
+        <div class="mode-card" id="modeCard-numpad" onclick="switchMode('numpad')">
+          <div class="mode-icon">🔢</div>
+          <div class="mode-info">
+            <h3>Numpad Számlázó</h3>
+            <p>Összegek és kódok rögzítése</p>
+          </div>
+        </div>
+        <div class="mode-card" id="modeCard-hunt" onclick="switchMode('hunt')">
+          <div class="mode-icon">🔍</div>
+          <div class="mode-info">
+            <h3>Adat Hibavadász</h3>
+            <p>Eltérések jelölése és ellenőrzése</p>
+          </div>
+        </div>
+        <div class="mode-card" id="modeCard-office" onclick="switchMode('office')">
+          <div class="mode-icon">🏢</div>
+          <div class="mode-info">
+            <h3>Irodai Próbanap</h3>
+            <p>Komplex 3 állomásos szimuláció</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Műszerfal (HUD) & Nehézségi szint választó -->
+      <div class="hud-wrapper">
+        <div class="hud">
+          <div class="hud-box">
+            <div class="hud-label">Hátralévő idő</div>
+            <div class="hud-val" id="hudTime">60s</div>
+          </div>
+          <div class="hud-box">
+            <div class="hud-label">Leütés / Perc</div>
+            <div class="hud-val" id="hudCPM">0</div>
+          </div>
+          <div class="hud-box">
+            <div class="hud-label">Pontosság</div>
+            <div class="hud-val" id="hudAcc">100%</div>
+          </div>
+          <div class="hud-box">
+            <div class="hud-label">Összpontszám</div>
+            <div class="hud-val" id="hudScore">0</div>
+          </div>
+        </div>
+
+        <div class="diff-selector" id="diffSelectorPanel">
+          <div class="diff-label">Nehézségi szint</div>
+          <div class="diff-pills">
+            <button class="diff-btn diff-easy" id="diffBtn-easy" onclick="setDifficulty('easy')">Kezdő</button>
+            <button class="diff-btn diff-med active" id="diffBtn-med" onclick="setDifficulty('med')">Haladó</button>
+            <button class="diff-btn diff-hard" id="diffBtn-hard" onclick="setDifficulty('hard')">Bajnok</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Fő Játéktér -->
+      <div class="arena-panel">
+        <input type="text" id="hiddenInput" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+
+        <!-- Kezdő / Start Felugró Réteg -->
+        <div class="start-overlay" id="startOverlay">
+          <h2 style="color:var(--accent); font-size:1.75rem;" id="startTitle">Készen állsz a feladatra?</h2>
+          <div class="start-inputs">
+            <label for="playerNameInputMain">Versenyző neve:</label>
+            <input type="text" id="playerNameInputMain" value="Vendég Játékos" onkeydown="if(event.key==='Enter') startTheGame()">
+          </div>
+          <button class="btn-start-action" onclick="startTheGame()" id="btnStartGame">🚀 JÁTÉK INDÍTÁSA (60 mp)</button>
+        </div>
+
+        <!-- 1. Gépírás Nézet -->
+        <div id="view-speed" class="typing-display"></div>
+
+        <!-- 2. Numpad Nézet -->
+        <div id="view-numpad" class="numpad-task" style="display:none;">
+          <span class="task-badge" id="numpadItemLabel">1 / 5 TÉTEL</span>
+          <div class="numpad-target" id="numpadTarget">14850</div>
+          <div class="numpad-entry" id="numpadEntry"></div>
+          <div class="numpad-hint">Üsd be a számot, majd nyomj <strong>Entert [↵]</strong>! (Javítás: ⌫ Backspace)</div>
+        </div>
+
+        <!-- 3. Hibavadász Nézet -->
+        <div id="view-hunt" style="display:none;">
+          <div class="hunt-instructions">
+            Hasonlítsd össze az eredeti kifejezést a rögzített másolattal! Jelöld be azokat a sorokat, ahol elütést látsz, majd kattints az <strong>„ELLENŐRZÉS”</strong> gombra!
+          </div>
+
+          <table class="hunt-table">
+            <thead>
+              <tr>
+                <th style="width: 10%; text-align: center;">Jelölés</th>
+                <th style="width: 35%;">Eredeti kifejezés</th>
+                <th style="width: 35%;">Rögzített másolat</th>
+                <th style="width: 20%; text-align: center;">Eredmény</th>
+              </tr>
+            </thead>
+            <tbody id="huntPlayTableBody"></tbody>
+          </table>
+
+          <div class="hunt-actions">
+            <button class="btn-primary" id="btnVerifyHunt" onclick="verifyHuntAnswers()">🔍 ELLENŐRZÉS</button>
+            <button class="btn-outline" id="btnNextHuntSet" onclick="loadNewHuntSet()" style="display:none;">Következő feladatsor ➔</button>
+          </div>
+
+          <!-- Tanári szótárszerkesztő -->
+          <div class="dataset-editor">
+            <div class="editor-header" onclick="toggleDatasetEditor()">
+              <span>⚙️ Szótár és Kifejezések Szerkesztése (Kattints a megnyitáshoz)</span>
+              <span id="editorToggleIcon">▼</span>
+            </div>
+            
+            <div class="editor-body" id="editorBody" style="display: none;">
+              <div class="add-word-form">
+                <input type="text" id="newOrigWord" placeholder="Eredeti helyes szó (pl. monitor)">
+                <input type="text" id="newCopyWord" placeholder="Másolat (pl. monnitor vagy monitor)">
+                <button class="btn-primary" onclick="addNewHuntWord()">➕ Hozzáadás</button>
+              </div>
+
+              <table class="editor-table">
+                <thead>
+                  <tr>
+                    <th>Eredeti</th>
+                    <th>Másolat</th>
+                    <th>Állapot</th>
+                    <th>Műveletek</th>
+                  </tr>
+                </thead>
+                <tbody id="editorTableBody"></tbody>
+              </table>
+              <div style="margin-top:0.75rem; display:flex; justify-content:space-between;">
+                <button class="btn-outline" onclick="restoreDefaultWords()">♻️ Alapértelmezett szavak visszaállítása</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4. Irodai Próbanap Nézet -->
+        <div id="view-office" style="display:none;">
+          <div class="office-stage-tracker">
+            <div class="office-step-pill" id="officeStep1">1. Ügyféladatok (QWERTZ)</div>
+            <div class="office-step-pill" id="officeStep2">2. Számlázás (Numpad)</div>
+            <div class="office-step-pill" id="officeStep3">3. Bizonylatellenőrzés</div>
+          </div>
+          <div id="officeStageContainer"></div>
+        </div>
+      </div>
+
+      <!-- Interaktív Kéz-diagram & Billentyűzetek Területe -->
+      <div class="keyboard-interactive-area">
+        <!-- Vakíró Kéz-kontúr SVG Diagram -->
+        <div class="hands-container" id="handsGuide">
+          <!-- Bal Kéz SVG -->
+          <svg class="hand-svg" viewBox="0 0 140 60" xmlns="http://www.w3.org/2000/svg">
+            <text x="70" y="55" fill="#64748b" font-size="10" font-weight="700" text-anchor="middle">BAL KÉZ</text>
+            <!-- Tenyér ív -->
+            <path d="M 15 45 Q 70 52 125 45" stroke="#334155" stroke-width="2" fill="none" stroke-linecap="round"/>
+            <!-- Ujj vonalak és hegyek -->
+            <!-- Kisujj (Pinky) -->
+            <line x1="20" y1="42" x2="20" y2="18" stroke="#334155" stroke-width="3" stroke-linecap="round"/>
+            <circle class="finger-tip" id="finger-lp" cx="20" cy="15" r="7" fill="var(--f-pinky)"/>
+            <!-- Gyűrűs (Ring) -->
+            <line x1="45" y1="43" x2="45" y2="12" stroke="#334155" stroke-width="3" stroke-linecap="round"/>
+            <circle class="finger-tip" id="finger-lr" cx="45" cy="9" r="7" fill="var(--f-ring)"/>
+            <!-- Középső (Middle) -->
+            <line x1="70" y1="44" x2="70" y2="8" stroke="#334155" stroke-width="3" stroke-linecap="round"/>
+            <circle class="finger-tip" id="finger-lm" cx="70" cy="5" r="7" fill="var(--f-middle)"/>
+            <!-- Mutató (Index) -->
+            <line x1="95" y1="43" x2="95" y2="12" stroke="#334155" stroke-width="3" stroke-linecap="round"/>
+            <circle class="finger-tip" id="finger-li" cx="95" cy="9" r="7" fill="var(--f-index)"/>
+            <!-- Hüvelyk (Thumb) -->
+            <line x1="120" y1="44" x2="128" y2="28" stroke="#334155" stroke-width="3" stroke-linecap="round"/>
+            <circle class="finger-tip" id="finger-lth" cx="130" cy="25" r="7" fill="var(--f-thumb)"/>
+          </svg>
+
+          <!-- Jobb Kéz SVG -->
+          <svg class="hand-svg" viewBox="0 0 140 60" xmlns="http://www.w3.org/2000/svg">
+            <text x="70" y="55" fill="#64748b" font-size="10" font-weight="700" text-anchor="middle">JOBB KÉZ</text>
+            <path d="M 15 45 Q 70 52 125 45" stroke="#334155" stroke-width="2" fill="none" stroke-linecap="round"/>
+            <!-- Hüvelyk (Thumb) -->
+            <line x1="20" y1="44" x2="12" y2="28" stroke="#334155" stroke-width="3" stroke-linecap="round"/>
+            <circle class="finger-tip" id="finger-rth" cx="10" cy="25" r="7" fill="var(--f-thumb)"/>
+            <!-- Mutató (Index) -->
+            <line x1="45" y1="43" x2="45" y2="12" stroke="#334155" stroke-width="3" stroke-linecap="round"/>
+            <circle class="finger-tip" id="finger-ri" cx="45" cy="9" r="7" fill="var(--f-index)"/>
+            <!-- Középső (Middle) -->
+            <line x1="70" y1="44" x2="70" y2="8" stroke="#334155" stroke-width="3" stroke-linecap="round"/>
+            <circle class="finger-tip" id="finger-rm" cx="70" cy="5" r="7" fill="var(--f-middle)"/>
+            <!-- Gyűrűs (Ring) -->
+            <line x1="95" y1="43" x2="95" y2="12" stroke="#334155" stroke-width="3" stroke-linecap="round"/>
+            <circle class="finger-tip" id="finger-rr" cx="95" cy="9" r="7" fill="var(--f-ring)"/>
+            <!-- Kisujj (Pinky) -->
+            <line x1="120" y1="42" x2="120" y2="18" stroke="#334155" stroke-width="3" stroke-linecap="round"/>
+            <circle class="finger-tip" id="finger-rp" cx="120" cy="15" r="7" fill="var(--f-pinky)"/>
+          </svg>
+        </div>
+
+        <div class="keyboards-wrapper">
+          <!-- QWERTZ Billentyűzet -->
+          <div class="kb-block" id="qwertzKb">
+            <div class="kb-row">
+              <div class="key f-lp" data-key="0">0</div>
+              <div class="key f-lp" data-key="1">1</div>
+              <div class="key f-lr" data-key="2">2</div>
+              <div class="key f-lm" data-key="3">3</div>
+              <div class="key f-li" data-key="4">4</div>
+              <div class="key f-li" data-key="5">5</div>
+              <div class="key f-ri" data-key="6">6</div>
+              <div class="key f-ri" data-key="7">7</div>
+              <div class="key f-rm" data-key="8">8</div>
+              <div class="key f-rr" data-key="9">9</div>
+              <div class="key f-rp" data-key="ö">Ö</div>
+              <div class="key f-rp" data-key="ü">Ü</div>
+              <div class="key f-rp" data-key="ó">Ó</div>
+              <div class="key w-15" data-key="backspace">⌫</div>
+            </div>
+            <div class="kb-row">
+              <div class="key w-15" data-key="tab">Tab</div>
+              <div class="key f-lp" data-key="q">Q</div>
+              <div class="key f-lr" data-key="w">W</div>
+              <div class="key f-lm" data-key="e">E</div>
+              <div class="key f-li" data-key="r">R</div>
+              <div class="key f-li" data-key="t">T</div>
+              <div class="key f-ri" data-key="z">Z</div>
+              <div class="key f-ri" data-key="u">U</div>
+              <div class="key f-rm" data-key="i">I</div>
+              <div class="key f-rr" data-key="o">O</div>
+              <div class="key f-rp" data-key="p">P</div>
+              <div class="key f-rp" data-key="ő">Ő</div>
+              <div class="key f-rp" data-key="ú">Ú</div>
+            </div>
+            <div class="kb-row">
+              <div class="key w-20" data-key="capslock">Caps</div>
+              <div class="key f-lp" data-key="a">A</div>
+              <div class="key f-lr" data-key="s">S</div>
+              <div class="key f-lm" data-key="d">D</div>
+              <div class="key f-li" data-key="f">F</div>
+              <div class="key f-li" data-key="g">G</div>
+              <div class="key f-ri" data-key="h">H</div>
+              <div class="key f-ri" data-key="j">J</div>
+              <div class="key f-rm" data-key="k">K</div>
+              <div class="key f-rr" data-key="l">L</div>
+              <div class="key f-rp" data-key="é">É</div>
+              <div class="key f-rp" data-key="á">Á</div>
+              <div class="key f-rp" data-key="ű">Ű</div>
+              <div class="key w-15" data-key="enter">↵</div>
+            </div>
+            <div class="kb-row">
+              <div class="key w-15 f-lp" data-key="shift-left">⇧</div>
+              <div class="key f-lp" data-key="í">Í</div>
+              <div class="key f-lp" data-key="y">Y</div>
+              <div class="key f-lr" data-key="x">X</div>
+              <div class="key f-lm" data-key="c">C</div>
+              <div class="key f-li" data-key="v">V</div>
+              <div class="key f-ri" data-key="b">B</div>
+              <div class="key f-ri" data-key="n">N</div>
+              <div class="key f-ri" data-key="m">M</div>
+              <div class="key f-rm" data-key=",">,</div>
+              <div class="key f-rr" data-key=".">.</div>
+              <div class="key f-rp" data-key="-">-</div>
+              <div class="key w-20 f-rp" data-key="shift-right">⇧</div>
+            </div>
+            <div class="kb-row">
+              <div class="key w-space f-th" data-key=" ">SZÓKÖZ</div>
+            </div>
+          </div>
+
+          <!-- Numpad Billentyűzet (CSS Grid) -->
+          <div class="kb-block" id="numpadKb">
+            <div class="numpad-grid">
+              <div class="key f-lp" data-key="num">Num</div>
+              <div class="key f-lm" data-key="/">/</div>
+              <div class="key f-ri" data-key="*">*</div>
+              <div class="key f-rp" data-key="-">-</div>
+
+              <div class="key f-li" data-key="7">7</div>
+              <div class="key f-rm" data-key="8">8</div>
+              <div class="key f-rr" data-key="9">9</div>
+              <div class="key key-plus f-rp" data-key="+">+</div>
+
+              <div class="key f-li" data-key="4">4</div>
+              <div class="key f-rm" data-key="5">5</div>
+              <div class="key f-rr" data-key="6">6</div>
+
+              <div class="key f-li" data-key="1">1</div>
+              <div class="key f-rm" data-key="2">2</div>
+              <div class="key f-rr" data-key="3">3</div>
+              <div class="key key-enter f-rp" data-key="enter">↵</div>
+
+              <div class="key key-zero f-th" data-key="0">0</div>
+              <div class="key f-rr" data-key=",">,</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- KIVETÍTŐ NÉZET -->
+  <div id="projectorView" class="projector-view">
+    <div class="projector-title">⚡ ADAT-ARÉNA – ÉLŐ KÖZVETÍTÉS ⚡</div>
+    <div class="live-contestant">
+      <div style="color:var(--text-muted); text-transform:uppercase; font-size:1rem; letter-spacing:0.1em;">Aktuális Versenyző</div>
+      <div class="name" id="projPlayerName">Vendég Játékos</div>
+      <div class="live-stats">
+        <div>
+          <div style="font-size:1rem; color:var(--text-muted);">SEBESSÉG</div>
+          <div class="live-stat-val" id="projCPM">0 <span style="font-size:1.5rem">CPM</span></div>
+        </div>
+        <div>
+          <div style="font-size:1rem; color:var(--text-muted);">PONTOSSÁG</div>
+          <div class="live-stat-val" id="projAcc">100%</div>
+        </div>
+        <div>
+          <div style="font-size:1rem; color:var(--text-muted);">PONTSZÁM</div>
+          <div class="live-stat-val" id="projScore">0</div>
+        </div>
+      </div>
+    </div>
+    <div class="leaderboard">
+      <div class="lb-filter-bar">
+        <button class="lb-filter-btn active" onclick="filterProjectorLB('all', this)">Összesített</button>
+        <button class="lb-filter-btn" onclick="filterProjectorLB('Sprint', this)">Sprint</button>
+        <button class="lb-filter-btn" onclick="filterProjectorLB('Numpad', this)">Numpad</button>
+        <button class="lb-filter-btn" onclick="filterProjectorLB('Vadász', this)">Hibavadász</button>
+        <button class="lb-filter-btn" onclick="filterProjectorLB('Próbanap', this)">Próbanap</button>
+      </div>
+      <div class="lb-header">
+        <div>#</div>
+        <div>Név</div>
+        <div>Mód</div>
+        <div>CPM</div>
+        <div>Pontszám</div>
+      </div>
+      <div id="projLbRows"></div>
+    </div>
+    <div style="color:var(--text-muted); font-size:0.95rem;">
+      Zöldmező EGYMI – Számítógépes Adatrögzítő Bemutató Kioszk
+    </div>
+  </div>
+
+  <!-- NYOMTATHATÓ MATRICA MODAL -->
+  <div class="modal-backdrop" id="resultModal">
+    <div class="modal-content">
+      <h2 style="color:var(--accent);">🎉 Futam Befejezve!</h2>
+      <div class="sticker-card" id="printableSticker">
+        <div class="sticker-header">
+          <span>Adat-Aréna Tanúsítvány</span>
+          <span>Zöldmező EGYMI</span>
+        </div>
+        <div class="sticker-name" id="stkName">Vendég Játékos</div>
+        <div class="sticker-grid">
+          <div>Mód / Szint: <strong id="stkMode">Sprint (Haladó)</strong></div>
+          <div>Dátum: <strong id="stkDate">2026.11.09</strong></div>
+          <div>Sebesség: <strong id="stkCPM">0 CPM</strong></div>
+          <div>Pontosság: <strong id="stkAcc">0%</strong></div>
+          <div>Pontszám: <strong id="stkScore">0 pont</strong></div>
+          <div>Minősítés: <span class="sticker-badge" id="stkRank">Mester Adatrögzítő</span></div>
+        </div>
+        <div class="sticker-analysis" id="stkAnalysis">
+          <div>🎯 <strong>Erősség:</strong> <span id="stkStrength">Kiváló alapsor sebesség</span></div>
+          <div>⚠️ <strong>Gyakorlandó:</strong> <span id="stkWeakness">Ékezetes betűk pontosabb leütése</span></div>
+        </div>
+      </div>
+      <div style="display:flex; gap:0.5rem; justify-content:center; margin-top:1rem; flex-wrap:wrap;">
+        <button class="btn-primary" onclick="window.print()">🖨️ Matrica Nyomtatása</button>
+        <button class="btn-outline" onclick="exportLeaderboardCSV()">📥 CSV Export</button>
+        <button class="btn-outline" onclick="closeResultAndShowStart()">Új Menet / Új Név</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
