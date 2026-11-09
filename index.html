@@ -131,38 +131,6 @@
 
           <div class="hunt-actions">
             <button class="btn-primary" id="btnVerifyHunt" onclick="verifyHuntAnswers()">🔍 ELLENŐRZÉS</button>
-            <button class="btn-outline" id="btnNextHuntSet" onclick="loadNewHuntSet()" style="display:none;">Következő feladatsor ➔</button>
-          </div>
-
-          <!-- Tanári szótárszerkesztő -->
-          <div class="dataset-editor">
-            <div class="editor-header" onclick="toggleDatasetEditor()">
-              <span>⚙️ Szótár és Kifejezések Szerkesztése (Kattints a megnyitáshoz)</span>
-              <span id="editorToggleIcon">▼</span>
-            </div>
-            
-            <div class="editor-body" id="editorBody" style="display: none;">
-              <div class="add-word-form">
-                <input type="text" id="newOrigWord" placeholder="Eredeti helyes szó (pl. monitor)">
-                <input type="text" id="newCopyWord" placeholder="Másolat (pl. monnitor vagy monitor)">
-                <button class="btn-primary" onclick="addNewHuntWord()">➕ Hozzáadás</button>
-              </div>
-
-              <table class="editor-table">
-                <thead>
-                  <tr>
-                    <th>Eredeti</th>
-                    <th>Másolat</th>
-                    <th>Állapot</th>
-                    <th>Műveletek</th>
-                  </tr>
-                </thead>
-                <tbody id="editorTableBody"></tbody>
-              </table>
-              <div style="margin-top:0.75rem; display:flex; justify-content:space-between;">
-                <button class="btn-outline" onclick="restoreDefaultWords()">♻️ Alapértelmezett szavak visszaállítása</button>
-              </div>
-            </div>
           </div>
         </div>
 
@@ -174,6 +142,37 @@
             <div class="office-step-pill" id="officeStep3">3. Bizonylatellenőrzés</div>
           </div>
           <div id="officeStageContainer"></div>
+        </div>
+      </div>
+
+      <!-- Tanári szótárszerkesztő (a játéktéren KÍVÜL, hogy a start-réteg ne takarja le) -->
+      <div class="dataset-editor" id="huntEditorPanel" style="display:none;">
+        <div class="editor-header" onclick="toggleDatasetEditor()">
+          <span>⚙️ Hibavadász szótár szerkesztése (tanári felület – kattints a megnyitáshoz)</span>
+          <span id="editorToggleIcon">▼</span>
+        </div>
+
+        <div class="editor-body" id="editorBody" style="display: none;">
+          <div class="add-word-form">
+            <input type="text" id="newOrigWord" placeholder="Eredeti helyes szó (pl. monitor)" onkeydown="if(event.key==='Enter') addNewHuntWord()">
+            <input type="text" id="newCopyWord" placeholder="Másolat (pl. monnitor vagy monitor)" onkeydown="if(event.key==='Enter') addNewHuntWord()">
+            <button class="btn-primary" onclick="addNewHuntWord()">➕ Hozzáadás</button>
+          </div>
+
+          <table class="editor-table">
+            <thead>
+              <tr>
+                <th>Eredeti</th>
+                <th>Másolat</th>
+                <th>Állapot</th>
+                <th>Műveletek</th>
+              </tr>
+            </thead>
+            <tbody id="editorTableBody"></tbody>
+          </table>
+          <div style="margin-top:0.75rem; display:flex; justify-content:space-between;">
+            <button class="btn-outline" onclick="restoreDefaultWords()">♻️ Alapértelmezett szavak visszaállítása</button>
+          </div>
         </div>
       </div>
 
@@ -370,13 +369,13 @@
     </div>
   </div>
 
-  <!-- NYOMTATHATÓ MATRICA MODAL -->
+  <!-- EREDMÉNY MODAL (e-mail küldéssel) -->
   <div class="modal-backdrop" id="resultModal">
     <div class="modal-content">
       <h2 style="color:var(--accent);">🎉 Futam Befejezve!</h2>
       <div class="sticker-card" id="printableSticker">
         <div class="sticker-header">
-          <span>Adat-Aréna Tanúsítvány</span>
+          <span>Adat-Aréna Eredménylap</span>
           <span>Zöldmező EGYMI</span>
         </div>
         <div class="sticker-name" id="stkName">Vendég Játékos</div>
@@ -393,8 +392,17 @@
           <div>⚠️ <strong>Gyakorlandó:</strong> <span id="stkWeakness">Ékezetes betűk pontosabb leütése</span></div>
         </div>
       </div>
+      <!-- Eredmény küldése e-mailben -->
+      <div class="email-send-box">
+        <label for="resultEmailInput">📧 Kérd e-mailben az eredményed!</label>
+        <div class="email-send-row">
+          <input type="email" id="resultEmailInput" placeholder="pelda@email.hu" autocomplete="off" onkeydown="if(event.key==='Enter') sendResultEmail()">
+          <button class="btn-primary" id="btnSendEmail" onclick="sendResultEmail()">Küldés</button>
+        </div>
+        <div class="email-privacy-note">Az e-mail címet nem mentjük el, kizárólag ennek az egy levélnek a kiküldésére használjuk.</div>
+        <div class="email-status" id="emailStatus"></div>
+      </div>
       <div style="display:flex; gap:0.5rem; justify-content:center; margin-top:1rem; flex-wrap:wrap;">
-        <button class="btn-primary" onclick="window.print()">🖨️ Matrica Nyomtatása</button>
         <button class="btn-outline" onclick="exportLeaderboardCSV()">📥 CSV Export</button>
         <button class="btn-outline" onclick="closeResultAndShowStart()">Új Menet / Új Név</button>
       </div>

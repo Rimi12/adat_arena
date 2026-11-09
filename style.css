@@ -596,25 +596,29 @@ main {
 .lb-row:nth-child(even) { background: #162032; }
 .lb-row.top-1 { color: #facc15; font-weight: bold; }
 
-@page {
-  size: 85mm 54mm;
-  margin: 0;
+/* Eredmény e-mail küldés */
+.email-send-box {
+  text-align: left;
+  background: #0f172a;
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  padding: 0.75rem 0.9rem;
+  margin-top: 0.5rem;
 }
-@media print {
-  body * { visibility: hidden; }
-  .modal-backdrop, .modal-backdrop * { visibility: hidden; }
-  .sticker-card, .sticker-card * { visibility: visible; }
-  .sticker-card {
-    position: fixed;
-    left: 0;
-    top: 0;
-    width: 85mm;
-    height: 54mm;
-    margin: 0;
-    padding: 5mm;
-    border: 1px solid #000;
-    border-radius: 0;
-    box-sizing: border-box;
-    page-break-after: avoid;
-  }
+.email-send-box label { font-size: 0.9rem; font-weight: 700; color: var(--accent); }
+.email-send-row { display: flex; gap: 0.5rem; margin-top: 0.4rem; }
+.email-send-row input {
+  flex: 1;
+  background: #1e293b;
+  border: 1px solid var(--card-border);
+  padding: 0.55rem 0.75rem;
+  border-radius: 6px;
+  color: #fff;
+  font-size: 0.95rem;
 }
+.email-privacy-note { font-size: 0.72rem; color: var(--text-muted); margin-top: 0.35rem; }
+.email-status { font-size: 0.85rem; margin-top: 0.35rem; min-height: 1.1rem; }
+.email-status.ok { color: var(--success); }
+.email-status.err { color: var(--danger); }
+.email-status.info { color: var(--text-muted); }
+#huntEditorPanel { margin-top: 0; }

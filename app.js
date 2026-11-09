@@ -22,6 +22,17 @@ let soundEnabled = localStorage.getItem('adat_arena_sound') !== 'false';
 // Statisztikák és hiba-diagnosztika
 let keyStats = {}; // { [char]: { attempts: 0, errors: 0 } }
 let currentProjectorFilter = 'all';
+let lastResult = null; // Az utolsó futam eredménye (e-mail küldéshez)
+
+// HTML speciális karakterek kódolása (szótár, nevek biztonságos megjelenítése)
+function escapeHtml(str) {
+  return String(str == null ? '' : str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 
 // ------------------------------------------
 // Web Audio API – Teljesen offline hangeffektek
@@ -333,7 +344,11 @@ function switchMode(mode) {
   const numpadView = document.getElementById('view-numpad');
   const huntView = document.getElementById('view-hunt');
   const officeView = document.getElementById('view-office');
-  const handsContainer = document.getElementById('handsContainer');
+  const handsContainer = document.getElementById('handsGuide');
+  const huntEditorPanel = document.getElementById('huntEditorPanel');
+  if (huntEditorPanel) huntEditorPanel.style.display = mode === 'hunt' ? 'block' : 'none';
+  const startBtn = document.getElementById('btnStartGame');
+  if (startBtn) startBtn.innerText = mode === 'office' ? '🚀 JÁTÉK INDÍTÁSA (90 mp)' : '🚀 JÁTÉK INDÍTÁSA (60 mp)';
 
   speedView.style.display = mode === 'speed' ? 'block' : 'none';
   numpadView.style.display = mode === 'numpad' ? 'flex' : 'none';
@@ -619,9 +634,9 @@ function updateOfficeStepPills() {
   [1, 2, 3].forEach(step => {
     const pill = document.getElementById('officeStep' + step);
     if (!pill) return;
-    pill.classList.remove('active', 'done');
+    pill.classList.remove('active', 'completed');
     if (officeStage === step) pill.classList.add('active');
-    else if (officeStage > step) pill.classList.add('done');
+    else if (officeStage > step) pill.classList.add('completed');
   });
 }
 
@@ -1160,8 +1175,8 @@ function loadNewHuntSet() {
       <td style="text-align: center;">
         <input type="checkbox" class="hunt-checkbox" id="chk-${index}" onclick="event.stopPropagation()">
       </td>
-      <td><strong>${item.orig}</strong></td>
-      <td style="font-family: monospace; font-size: 1.15rem; color: var(--accent);">${item.copy}</td>
+      <td><strong>${escapeHtml(item.orig)}</strong></td>
+      <td style="font-family: monospace; font-size: 1.15rem; color: var(--accent);">${escapeHtml(item.copy)}</td>
       <td id="res-cell-${index}" style="text-align: center; font-size:0.85rem; color: var(--text-muted);">-</td>
     `;
     tr.addEventListener('click', () => {
@@ -1175,7 +1190,7 @@ function loadNewHuntSet() {
   });
 }
 
-function verifyHuntBatch() {
+function verifyHuntAnswers() {
   if (!gameActive) {
     alert("A futam még nem indult el! Kattints a fenti 'Futam Indítása' gombra.");
     return;
@@ -1217,13 +1232,32 @@ function verifyHuntBatch() {
 
   updateHUD();
 
+  // Dupla kattintás elleni védelem, majd új feladatsor
+  const verifyBtn = document.getElementById('btnVerifyHunt');
+  if (verifyBtn) verifyBtn.disabled = true;
   setTimeout(() => {
+    if (verifyBtn) verifyBtn.disabled = false;
     if (gameActive) loadNewHuntSet();
   }, 1200);
 }
 
+// Tanári szótárszerkesztő lenyitása / becsukása
+function toggleDatasetEditor() {
+  const body = document.getElementById('editorBody');
+  const icon = document.getElementById('editorToggleIcon');
+  if (!body) return;
+  const isOpen = body.style.display !== 'none';
+  body.style.display = isOpen ? 'none' : 'block';
+  if (icon) icon.innerText = isOpen ? '▼' : '▲';
+  if (!isOpen) {
+    renderEditorTable();
+    const origInput = document.getElementById('newOrigWord');
+    if (origInput) origInput.focus();
+  }
+}
+
 function renderEditorTable() {
-  const tbody = document.getElementById('wordsEditorBody');
+  const tbody = document.getElementById('editorTableBody');
   if (!tbody) return;
   const words = getStoredWords();
   tbody.innerHTML = '';
@@ -1232,8 +1266,8 @@ function renderEditorTable() {
     const isErr = item.orig !== item.copy;
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td><input type="text" class="editor-inline-input" value="${item.orig}" onchange="updateWordField(${index}, 'orig', this.value)"></td>
-      <td><input type="text" class="editor-inline-input" value="${item.copy}" onchange="updateWordField(${index}, 'copy', this.value)"></td>
+      <td><input type="text" class="editor-inline-input" value="${escapeHtml(item.orig)}" onchange="updateWordField(${index}, 'orig', this.value)"></td>
+      <td><input type="text" class="editor-inline-input" value="${escapeHtml(item.copy)}" onchange="updateWordField(${index}, 'copy', this.value)"></td>
       <td style="text-align:center;">
         <span style="color:${isErr ? 'var(--danger)' : 'var(--success)'}; font-weight:bold;">
           ${isErr ? 'Eltérés' : 'Egyező'}
@@ -1396,6 +1430,32 @@ function endGame() {
   leaderboard.sort((a, b) => b.score - a.score || b.cpm - a.cpm);
   localStorage.setItem('adat_arena_lb', JSON.stringify(leaderboard));
 
+  // Mód / szint a kártyán
+  const modeText = `${modeLabels[currentMode] || currentMode} (${diffLabels[currentDifficulty] || 'Haladó'})`;
+  const stkMode = document.getElementById('stkMode');
+  if (stkMode) stkMode.innerText = modeText;
+
+  // Eredmény eltárolása az e-mail küldéshez (e-mail cím NÉLKÜL)
+  lastResult = {
+    name: activePlayerName,
+    mode: modeLabels[currentMode] || currentMode,
+    difficulty: diffLabels[currentDifficulty] || 'Haladó',
+    cpm: finalCPM,
+    acc: finalAcc,
+    score: score,
+    rank: rank,
+    strength: (document.getElementById('stkStrength') || {}).innerText || '',
+    weakness: (document.getElementById('stkWeakness') || {}).innerText || '',
+    date: new Date().toLocaleString('hu-HU')
+  };
+
+  // E-mail mező alaphelyzetbe
+  const emailInput = document.getElementById('resultEmailInput');
+  if (emailInput) emailInput.value = '';
+  setEmailStatus('', '');
+  const sendBtn = document.getElementById('btnSendEmail');
+  if (sendBtn) sendBtn.disabled = false;
+
   broadcastSync({ type: 'NEW_RESULT' });
 
   // Megjelenítjük a záró modált
@@ -1404,6 +1464,9 @@ function endGame() {
 
 function closeResultAndShowStart() {
   document.getElementById('resultModal').classList.remove('open');
+  const emailInput = document.getElementById('resultEmailInput');
+  if (emailInput) emailInput.value = '';
+  setEmailStatus('', '');
   document.getElementById('startOverlay').style.display = 'flex';
   const nameInput = document.getElementById('playerNameInputMain');
   if (nameInput) {
@@ -1439,10 +1502,11 @@ function renderLeaderboard(containerId) {
   filtered.slice(0, 10).forEach((entry, idx) => {
     const row = document.createElement('div');
     row.className = 'lb-row' + (idx === 0 ? ' top-1' : '');
-    const badge = entry.mode ? ` <span style="font-size:0.75rem; color:var(--text-muted); font-weight:normal;">(${entry.mode})</span>` : '';
+    const diff = entry.difficulty ? ` <span style="font-size:0.7rem; color:var(--text-muted); font-weight:normal;">(${escapeHtml(entry.difficulty)})</span>` : '';
     row.innerHTML = `
       <div>${idx + 1}.</div>
-      <div>${entry.name}${badge}</div>
+      <div>${escapeHtml(entry.name)}</div>
+      <div>${escapeHtml(entry.mode || '-')}${diff}</div>
       <div>${entry.cpm} CPM</div>
       <div><strong>${entry.score} pont</strong></div>
     `;
@@ -1499,4 +1563,68 @@ function exportLeaderboardCSV() {
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
   playSound('success');
+}
+
+// ==========================================
+// 14. EREDMÉNY KÜLDÉSE E-MAILBEN (Vercel szerverfüggvény: /api/send-result)
+// ==========================================
+function setEmailStatus(text, type) {
+  const el = document.getElementById('emailStatus');
+  if (!el) return;
+  el.className = 'email-status' + (type ? ' ' + type : '');
+  el.innerHTML = text;
+}
+
+function isValidEmail(email) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email);
+}
+
+async function sendResultEmail() {
+  const input = document.getElementById('resultEmailInput');
+  const btn = document.getElementById('btnSendEmail');
+  const email = input ? input.value.trim() : '';
+
+  if (!lastResult) {
+    setEmailStatus('Még nincs elküldhető eredmény.', 'err');
+    return;
+  }
+  if (!isValidEmail(email)) {
+    setEmailStatus('Kérlek, adj meg egy érvényes e-mail címet!', 'err');
+    if (input) input.focus();
+    return;
+  }
+  if (location.protocol === 'file:') {
+    setEmailStatus('Az e-mail küldés csak a webes (Vercel) változatban működik, helyi fájlból nem.', 'err');
+    return;
+  }
+  if (!navigator.onLine) {
+    setEmailStatus('Nincs internetkapcsolat, az e-mail most nem küldhető el.', 'err');
+    return;
+  }
+
+  if (btn) btn.disabled = true;
+  setEmailStatus('Küldés folyamatban…', 'info');
+
+  try {
+    const resp = await fetch('/api/send-result', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, result: lastResult })
+    });
+    const data = await resp.json().catch(() => ({}));
+
+    if (resp.ok && data.ok) {
+      setEmailStatus('✓ Elküldve! Nézd meg a postafiókodat (a levélszemét mappát is).', 'ok');
+      playSound('success');
+      if (input) input.value = '';
+    } else {
+      setEmailStatus('Hiba: ' + escapeHtml(data.error || ('a szerver ' + resp.status + ' kóddal válaszolt.')), 'err');
+      playSound('error');
+      if (btn) btn.disabled = false;
+    }
+  } catch (err) {
+    setEmailStatus('Hálózati hiba, az e-mail nem ment el. Próbáld újra!', 'err');
+    playSound('error');
+    if (btn) btn.disabled = false;
+  }
 }
